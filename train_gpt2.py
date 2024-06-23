@@ -204,3 +204,9 @@ while x.size(1) < max_length:
         xcol = torch.gather(topk_indices, -1, ix) # (B, 1)
         # append to the sequence
         x = torch.cat((x, xcol), dim=1)
+
+# print the generated text
+for i in range(num_return_sequences):
+    tokens = x[i, :max_length].tolist()
+    decoded = enc.decode(tokens)
+    print(">", decoded)
