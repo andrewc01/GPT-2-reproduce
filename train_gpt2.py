@@ -2,8 +2,15 @@ from dataclasses import dataclass
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
-
 import math
+
+# device setting
+if torch.cuda.is_available():
+        device = 'cuda' # nvidia gpu
+elif torch.backends.mps.is_available():
+    device = 'mps' # apple silicon gpu
+else:
+    device = 'cpu' # default
 
 # ------------------------------------------------------------------------------------------------
 class CasualSelfAttention(nn.Module):
@@ -167,5 +174,11 @@ max_length = 30
 
 model = GPT.from_pretrained('gpt2')
 model.eval()
-model.to('mps')
+model.to(device)
 
+import tiktoken
+enc = tiktoken.get_encoding('gpt2')
+tokens = enc.encode("Hello, I'm a language model,")
+tokens = torch.tensor(tokens, dtype=torch.long) # (8,)
+tokens = tokens.unsqueeze(0).repeat(num_return_sequences, 1) # (5, 8)
+x = tokens.to(device)
