@@ -13,6 +13,7 @@ else:
     device = 'cpu' # default
 
 # ------------------------------------------------------------------------------------------------
+
 class CasualSelfAttention(nn.Module):
 
     def __init__(self, config):
