@@ -12,6 +12,8 @@ elif torch.backends.mps.is_available():
 else:
     device = 'cpu' # default
 
+print(f"Using device: {device}")
+
 # ------------------------------------------------------------------------------------------------
 
 class CasualSelfAttention(nn.Module):
@@ -173,7 +175,8 @@ class GPT(nn.Module):
 num_return_sequences = 8
 max_length = 30
 
-model = GPT.from_pretrained('gpt2')
+# model = GPT.from_pretrained('gpt2')
+model = GPT(GPTConfig())
 model.eval()
 model.to(device)
 
