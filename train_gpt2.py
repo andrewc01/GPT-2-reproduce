@@ -4,16 +4,6 @@ import torch.nn as nn
 from torch.nn import functional as F
 import math
 
-# device setting
-if torch.cuda.is_available():
-        device = 'cuda' # nvidia gpu
-elif torch.backends.mps.is_available():
-    device = 'mps' # apple silicon gpu
-else:
-    device = 'cpu' # default
-
-print(f"Using device: {device}")
-
 # ------------------------------------------------------------------------------------------------
 
 class CasualSelfAttention(nn.Module):
@@ -105,7 +95,7 @@ class GPT(nn.Module):
         ))
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
 
-    def forward(self, idx):
+    def forward(self, idx, targets=None):
         # idx is of shape (B, T)
         B, T = idx.size()
         assert T <= self.config.block_size, f"Cannot forward sequence of length {T}, block size is only {self.config.block_size}"
@@ -120,7 +110,10 @@ class GPT(nn.Module):
         # forward the final layernorm and the classifier
         x = self.transformer.ln_f(x)
         logits = self.lm_head(x) # (B, T, vocab_size)
-        return logits
+        loss = None
+        if targets is not None:
+            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1))
+        return logits, loss
 
     @classmethod
     def from_pretrained(cls, model_type):
@@ -175,8 +168,38 @@ class GPT(nn.Module):
 num_return_sequences = 8
 max_length = 30
 
-# model = GPT.from_pretrained('gpt2')
+# device setting
+if torch.cuda.is_available():
+        device = 'cuda' # nvidia gpu
+elif torch.backends.mps.is_available():
+    device = 'mps' # apple silicon gpu
+else:
+    device = 'cpu' # default
+
+print(f"Using device: {device}")
+device = 'cpu'
+
+# get a data batch
+import tiktoken
+enc = tiktoken.get_encoding('gpt2')
+with open('input.txt', 'r') as f:
+    text = f.read()
+text = text[:1000]
+tokens = enc.encode(text)
+B, T = 4, 32
+buf = torch.tensor(tokens[:B*T + 1])
+x = buf[:-1].view(B, T)
+y = buf[1:].view(B, T)
+
+# get logits
 model = GPT(GPTConfig())
+model.to(device)
+logits, loss = model(x, y)
+
+print(loss)
+import sys; sys.exit(0)
+
+# prefix tokens
 model.eval()
 model.to(device)
 
