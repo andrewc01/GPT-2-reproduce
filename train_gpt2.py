@@ -301,8 +301,8 @@ if torch.cuda.is_available():
     torch.cuda.manual_seed(1337)
 
 total_batch_size = 524288 # 2**19, ~0.5M, in number of tokens
-B = 4
-T = 32
+B = 4 # should be 64 on A100 GPUs
+T = 32 # should be 1024 on A100 GPUs
 assert total_batch_size % (B * T * ddp_world_size) == 0, "make sure total_batch_size is divisible by B * T * ddp_world_size"
 grad_accum_steps = total_batch_size // (B * T * ddp_world_size)
 if master_process:
