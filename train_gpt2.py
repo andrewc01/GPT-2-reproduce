@@ -255,8 +255,9 @@ class DataLoaderLite:
 # torchrun --standalone --nproc_per_node=8 train_gpt2.py
 
 # run the training loop
-from torch.distributed import init_process_group, destroy_process_group, dist
+from torch.distributed import init_process_group, destroy_process_group
 from torch.nn.parallel import DistributedDataParallel as DDP
+import torch.distributed as dist
 
 # set up DDP (distributed data parallel)
 # torchrun command sets the env variables RANK, LOCAL_RANK, WORLD_SIZE
