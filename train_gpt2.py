@@ -255,7 +255,8 @@ class DataLoaderLite:
 # torchrun --standalone --nproc_per_node=8 train_gpt2.py
 
 # run the training loop
-from torch.distributed import init_process_group, destroy_process_group
+from torch.distributed import init_process_group, destroy_process_group, dist
+from torch.nn.parallel import DistributedDataParallel as DDP
 
 # set up DDP (distributed data parallel)
 # torchrun command sets the env variables RANK, LOCAL_RANK, WORLD_SIZE
@@ -312,11 +313,13 @@ train_loader = DataLoaderLite(B=B, T=T, process_rank=ddp_rank, num_processes=ddp
 
 torch.set_float32_matmul_precision('high')
 
-# get logits
+# create model
 model = GPT(GPTConfig(vocab_size=50304))
 model.to(device)
 if device == 'cuda':
     model = torch.compile(model)
+if ddp:
+    model = DDP(model, device_ids=[ddp_local_rank])
 
 max_lr = 6e-4
 min_lr = max_lr * 0.1
@@ -351,7 +354,11 @@ for step in range(max_steps):
         logits, loss = model(x, y)
         loss = loss / grad_accum_steps
         loss_accum += loss.detach()
+        if ddp:
+            model.require_backward_grad_sync = [micro_steps == grad_accum_steps - 1]
         loss.backward()
+    if ddp:
+        dist.all_reduce(loss_accum, op=dist.ReduceOp.AVG)
     norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
     # determine and set the learning rate for this iteration
     lr = get_lr(step)
@@ -361,9 +368,13 @@ for step in range(max_steps):
     # torch.cuda.synchronize() # wait for the GPU to finish work
     t1 = time.time()
     dt = t1 - t0 # time difference in seconds
-    tokens_processed = train_loader.B * train_loader.T * grad_accum_steps
+    tokens_processed = train_loader.B * train_loader.T * grad_accum_steps * ddp_world_size
     tokens_per_sec = tokens_processed / dt
-    print(f"step {step:4d} | loss: {loss_accum.item():.6f} | lr {lr:.4e} | norm: {norm:.4f} | dt: {dt*1000:.2f}ms | tok/sec: {tokens_per_sec:.2f}")
+    if master_process:
+        print(f"step {step:4d} | loss: {loss_accum.item():.6f} | lr {lr:.4e} | norm: {norm:.4f} | dt: {dt*1000:.2f}ms | tok/sec: {tokens_per_sec:.2f}")
+
+if ddp:
+    destroy_process_group()
 
 import sys; sys.exit(0)
 
