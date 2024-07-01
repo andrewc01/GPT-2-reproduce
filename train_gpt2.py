@@ -284,9 +284,6 @@ else:
         device = 'mps'
     print(f"Using device: {device}")
 
-num_return_sequences = 8
-max_length = 30
-
 # device setting
 if torch.cuda.is_available():
         device = 'cuda' # nvidia gpu
